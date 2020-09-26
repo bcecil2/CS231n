@@ -382,7 +382,22 @@ def layernorm_forward(x, gamma, beta, ln_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    oldX = x.copy()
+       
+    xMean = np.mean(x.T,axis=0)
+    
+    shiftedX = x.T - xMean.T
+    
+    xVar = np.var(shiftedX,axis=0)
+          
+    x = shiftedX / np.sqrt(xVar + eps)
+        
+    xHat = x.copy()
+        
+    x = x.T*gamma + beta
+        
+    out = x
+    cache = (gamma,shiftedX,xVar+eps,xHat,oldX)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -408,6 +423,8 @@ def layernorm_backward(dout, cache):
     - dbeta: Gradient with respect to shift parameter beta, of shape (D,)
     """
     dx, dgamma, dbeta = None, None, None
+    gamma,shiftedX,xVar,xHat,oldX = cache
+    
     ###########################################################################
     # TODO: Implement the backward pass for layer norm.                       #
     #                                                                         #
@@ -417,13 +434,25 @@ def layernorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    m = dout.shape[1]
+    
+    dXHat = dout*gamma
+    
+    dVar = np.sum(dXHat.T*shiftedX*(-0.5*(xVar**(-1.5))),axis=0)
+    
+    dMu = np.sum(dXHat.T*(-1/np.sqrt(xVar)),axis=0) + dVar.T*np.mean((-2*shiftedX),axis=0)
+    
+    dx = dXHat.T*(1/np.sqrt(xVar)) + dVar.T*((2*shiftedX)/m) + dMu.T/m
+    
+    dgamma = np.sum(dout*xHat.T,axis=0)
+    
+    dbeta = np.sum(dout,axis = 0)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
-    return dx, dgamma, dbeta
+    return dx.T, dgamma, dbeta
 
 
 def dropout_forward(x, dropout_param):
