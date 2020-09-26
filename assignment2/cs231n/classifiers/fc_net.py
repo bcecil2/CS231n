@@ -136,6 +136,22 @@ class TwoLayerNet(object):
 
         return loss, grads
 
+def affineBatchReluForward(X,W,b,gamma,beta,bnParam):
+    
+    aOut,aCache = affine_forward(X,W,b)
+    aBOut,aBCache = batchnorm_forward(aOut,gamma,beta,bnParam)
+    aBROut,aBRCache = relu_forward(aBOut)
+    
+    return aBROut,(aCache,aBCache,aBRCache)
+
+def affineBatchReluBackward(dout,cache):
+    
+    aCache,aBCache,aBRCache = cache
+    dr = relu_backward(dout,aBRCache)
+    dx,dgamma,dbeta = batchnorm_backward(dr,aBCache)
+    da,dw,db = affine_backward(dx,aCache)
+    
+    return da,dw,db,dgamma,dbeta 
 
 class FullyConnectedNet(object):
     """
@@ -209,12 +225,19 @@ class FullyConnectedNet(object):
         
         self.params['W1'] = weight_scale*np.random.randn(input_dim,hidden_dims[0])
         self.params['b1'] = np.zeros(hidden_dims[0],dtype=self.dtype)
+        if self.normalization == "batchnorm":
+            self.params['gamma1'] = np.ones(hidden_dims[0])
+            self.params['beta1'] = np.zeros(hidden_dims[0],dtype=self.dtype)
         for i in range(1,self.num_layers-1):
             self.params['W'+str(i+1)] = weight_scale*np.random.randn(hidden_dims[i-1],hidden_dims[i]) 
             self.params['b'+str(i+1)] = np.zeros(hidden_dims[i])
+            if self.normalization == "batchnorm":
+                self.params['gamma'+str(i+1)] = np.ones(hidden_dims[i])
+                self.params['beta'+str(i+1)] = np.zeros(hidden_dims[i],dtype=self.dtype)
         last = hidden_dims[self.num_layers-2]
         self.params['W'+str(self.num_layers)]  = weight_scale*np.random.randn(last,num_classes)
         self.params['b'+str(self.num_layers)] = np.zeros(num_classes)
+
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -282,7 +305,14 @@ class FullyConnectedNet(object):
         #    print(k,d.shape)
         
         for i in range(self.num_layers-1):
-            aROut, aRCache = affine_relu_forward(aROut,self.params['W'+str(i+1)],self.params['b'+str(i+1)])
+            if self.normalization == "batchnorm":
+                aROut,aRCache = affineBatchReluForward(aROut,self.params['W'+str(i+1)],
+                                             self.params['b'+str(i+1)],
+                                             self.params['gamma'+str(i+1)],
+                                             self.params['beta'+str(i+1)],
+                                       self.bn_params[i])
+            else:
+                aROut, aRCache = affine_relu_forward(aROut,self.params['W'+str(i+1)],self.params['b'+str(i+1)])
             cache[i] = aRCache
         last = self.num_layers
         scores, aCache = affine_forward(aROut, self.params['W'+str(last)],self.params['b'+str(last)])
@@ -323,7 +353,13 @@ class FullyConnectedNet(object):
         grads['b'+str(self.num_layers)] = dblast
         
         for i in range(self.num_layers-1,0,-1):
-            dx,dwi,dbi = affine_relu_backward(dx,cache[i-1])
+            if self.normalization == "batchnorm":
+                dx,dwi,dbi,dgammai,dbetai = affineBatchReluBackward(dx,cache[i-1])
+                grads['gamma'+str(i)] = dgammai
+                grads['beta'+str(i)] = dbetai
+            else:
+                dx,dwi,dbi = affine_relu_backward(dx,cache[i-1])
+            
             grads['W'+str(i)] = dwi + self.reg*self.params['W'+str(i)]
             grads['b'+str(i)] = dbi
         

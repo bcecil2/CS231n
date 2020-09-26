@@ -281,11 +281,11 @@ def batchnorm_backward(dout, cache):
     
     dXHat = dout*gamma
     
-    dVar = np.sum(dXHat*shiftedX*(-0.5*(xVar**(-1.5))),axis=0)
+    dVar = np.sum(dXHat*shiftedX*-0.5*xVar**(-1.5),axis=0)
     
-    dMu = np.sum(dXHat*(-1/np.sqrt(xVar)),axis=0) + dVar*np.sum((-2*shiftedX),axis=0)/m
+    dMu = np.sum(dXHat*-1/np.sqrt(xVar),axis=0) + dVar*np.mean(-2*shiftedX,axis=0)
     
-    dx = dXHat*(1/np.sqrt(xVar)) + dVar*((2*shiftedX)/m) + dMu/m
+    dx = dXHat*1/np.sqrt(xVar) + dVar*2.0/m*shiftedX + 1.0/m*dMu
     
     dgamma = np.sum(dout*xHat,axis=0)
     
@@ -313,6 +313,7 @@ def batchnorm_backward_alt(dout, cache):
     Inputs / outputs: Same as batchnorm_backward
     """
     dx, dgamma, dbeta = None, None, None
+    gamma,shiftedX,xVar,xHat,oldX = cache
     ###########################################################################
     # TODO: Implement the backward pass for batch normalization. Store the    #
     # results in the dx, dgamma, and dbeta variables.                         #
@@ -323,7 +324,19 @@ def batchnorm_backward_alt(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-     
+    m = dout.shape[0]
+    
+    dXHat = dout*gamma
+    
+    dVar = np.sum(dXHat*shiftedX*(-0.5*(xVar**(-1.5))),axis=0)
+    
+    dMu = np.sum(dXHat*(-1/np.sqrt(xVar)),axis=0) + dVar*np.sum((-2*shiftedX),axis=0)/m
+    
+    dx = dXHat*(1/np.sqrt(xVar)) + dVar*((2*shiftedX)/m) + dMu/m
+    
+    dgamma = np.sum(dout*xHat,axis=0)
+    
+    dbeta = np.sum(dout,axis = 0)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
